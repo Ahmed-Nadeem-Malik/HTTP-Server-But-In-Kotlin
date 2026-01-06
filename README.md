@@ -21,23 +21,23 @@ Requests/sec:  24590.82
 Transfer/sec:     22.49MB
 ```
 
-- **28,808 requests/second** - Exceptional throughput under extreme load
-- **178.90μs average latency** - Microsecond response times
-- **1.73 million total requests** in 60 seconds
-- **39.40 MB/sec transfer rate**
-- **99.97% sub-millisecond latency** - Consistently fast responses
+- **24,590 requests/second** - Exceptional throughput under extreme load
+- **3.99ms average latency** - Fast response times with low variance
+- **1.48 million total requests** in 60 seconds
+- **22.49MB/sec transfer rate**
+- **99.39% requests within standard deviation** - Consistent performance
 
 ## What I Built
 
 ### Core Technologies
 - **Kotlin** with coroutines for asynchronous programming
-- **Java NIO** for high-performance network programming
+- **Java Sockets** for network programming
 - **Coroutines-based concurrency** - Lightweight, efficient thread management
 - **Gradle build system** for modern dependency management
 
 ### Key Features
 - **Coroutine-based architecture** - Asynchronous request handling with minimal thread overhead
-- **Non-blocking I/O** - High throughput with efficient resource usage
+- **Blocking I/O with coroutines** - High throughput with efficient resource usage
 - **Simple routing system** - Easy to add new endpoints
 - **Complete HTTP/1.1 support** - Proper request parsing and response handling
 - **Cached static responses** - Pre-computed responses for maximum performance
@@ -55,7 +55,7 @@ The server uses coroutines for asynchronous request handling:
 │   Network Layer │  Coroutine Pool │     Routing Engine          │
 │                 │                 │                             │
 │ • Java Sockets  │ • Coroutines    │ • Simple Route Registration │
-│ • Non-blocking  │ • IO Dispatcher │ • Lambda-based Handlers     │
+│ • Blocking I/O  │ • IO Dispatcher │ • Lambda-based Handlers     │
 │ • TCP Mgmt      │ • 1024 Parallel  │ • Cached Static Content     │
 └─────────────────┴─────────────────┴─────────────────────────────┘
 ```
@@ -204,7 +204,7 @@ const val BACKLOG = 1000
 
 Building this server taught me about:
 
-- **Asynchronous programming** - Working with Kotlin coroutines and non-blocking I/O
+- **Asynchronous programming** - Working with Kotlin coroutines and blocking I/O
 - **HTTP protocol implementation** - Parsing headers, handling requests, and managing responses
 - **Concurrent programming** - Coroutine-based concurrency and thread-safe operations
 - **Network reliability** - Handling connections and request processing efficiently

@@ -1,108 +1,104 @@
 package org.example
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.BufferedReader
-import java.io.BufferedWriter
 import java.net.ServerSocket
 import java.net.Socket
 
-fun main() {
-    val server = ServerSocket(8000)
-    val routes = initRoutes()
+private val statusTexts = mapOf(
+    200 to "OK", 201 to "Created", 204 to "No Content", 404 to "Not Found", 500 to "Internal Server Error"
+)
 
-    while (true) {
-        handleClient(server.accept(), routes)
-    }
+object CachedResponses {
+    val index = buildResponse(200, "text/html", loadResource("/index.html") ?: "")
+    val css = buildResponse(200, "text/css", loadResource("/css/style.css") ?: "")
+    val js = buildResponse(200, "application/javascript", loadResource("/js/script.js") ?: "")
+    val notFound = buildResponse(404, "text/html", "<h1>404 Not Found</h1>")
+    val favicon = buildResponse(204, "text/plain", "")
 }
 
-fun handleClient(client: Socket, routes: Map<Pair<String, String>, Handler>) {
-    client.use { socket ->
-        val writer = socket.getOutputStream().bufferedWriter()
-        val reader = socket.getInputStream().bufferedReader()
+fun buildResponse(status: Int, contentType: String, body: String): ByteArray {
+    val statusText = statusTexts[status] ?: "Unknown"
+    val bodyBytes = body.toByteArray()
+    val header =
+        "HTTP/1.1 $status $statusText\r\nContent-Type: $contentType\r\nContent-Length: ${bodyBytes.size}\r\n\r\n"
+    return header.toByteArray() + bodyBytes
+}
 
-        val request = parsing(reader)
-        val route = request.method.uppercase() to request.path
+fun loadResource(path: String): String? = object {}.javaClass.getResource(path)?.readText()
 
-        when (val handler = routes[route]) {
-            null -> sendResponse(writer, 404, "text/html", "<h1>404 Not Found</h1>")
-            else -> handler(request, writer)
+typealias Handler = (HTTP, Socket) -> Unit
+
+fun main() = runBlocking {
+    val server = ServerSocket(8000, 1000)
+    server.reuseAddress = true
+    val routes = initRoutes()
+    val dispatcher = Dispatchers.IO.limitedParallelism(512)
+
+    while (true) {
+        val client = server.accept()
+        launch(dispatcher) {
+            handleClient(client, routes)
         }
     }
 }
 
-fun sendResponse(
-    writer: BufferedWriter, status: Int = 200, contentType: String = "text/html", body: String
-) {
-    val statusText = mapOf(
-        200 to "OK", 201 to "Created", 404 to "Not Found", 500 to "Internal Server Error"
-    )[status] ?: "Unknown"
+suspend fun handleClient(client: Socket, routes: Map<Pair<String, String>, Handler>) = withContext(Dispatchers.IO) {
+    try {
+        client.tcpNoDelay = true
+        client.use { socket ->
+            val reader = socket.getInputStream().bufferedReader()
+            val request = parsing(reader)
+            val route = request.method.uppercase() to request.path
 
-    writer.write("HTTP/1.1 $status $statusText\r\n")
-    writer.write("Content-Type: $contentType\r\n")
-    writer.write("Content-Length: ${body.toByteArray().size}\r\n")
-    writer.write("\r\n")
-    writer.write(body)
-    writer.flush()
+            when (val handler = routes[route]) {
+                null -> socket.getOutputStream().write(CachedResponses.notFound)
+                else -> handler(request, socket)
+            }
+        }
+    } catch (e: Exception) {
+    }
 }
 
 fun parsing(reader: BufferedReader): HTTP {
-    val requestLine = reader.readLine().split(" ")
-    val method = requestLine[0]
-    val path = requestLine[1]
+    val requestLine = reader.readLine() ?: throw IllegalStateException("Empty")
+    val firstSpace = requestLine.indexOf(' ')
+    val secondSpace = requestLine.indexOf(' ', firstSpace + 1)
+    val method = requestLine.substring(0, firstSpace)
+    val path = requestLine.substring(firstSpace + 1, secondSpace)
 
-    val headers: MutableMap<String, String> = mutableMapOf()
+    val headers = mutableMapOf<String, String>()
     var headerLine = reader.readLine()
-    while (headerLine.isNotBlank()) {
-        val colon = headerLine.indexOf(":")
-        val key = headerLine.substring(0, colon).trim()
-        val value = headerLine.substring(colon + 1).trim()
-        headers[key] = value
+    while (!headerLine.isNullOrEmpty()) {
+        val colon = headerLine.indexOf(':')
+        headers[headerLine.substring(0, colon)] = headerLine.substring(colon + 2)
         headerLine = reader.readLine()
     }
 
-    val body = headers["Content-Length"]?.toIntOrNull()?.let { length ->
-        val buffer = CharArray(length)
-        reader.read(buffer, 0, length)
-        String(buffer)
+    val body = headers["Content-Length"]?.toIntOrNull()?.let { len ->
+        CharArray(len).also { reader.read(it, 0, len) }.let(::String)
     } ?: ""
 
     return HTTP(method, path, headers, body)
 }
 
-data class HTTP(
-    val method: String, val path: String, val headers: MutableMap<String, String>, val body: String
-)
-
-// Handler takes request and writer
-typealias Handler = (HTTP, BufferedWriter) -> Unit
+data class HTTP(val method: String, val path: String, val headers: Map<String, String>, val body: String)
 
 fun initRoutes(): Map<Pair<String, String>, Handler> {
     val routes = mutableMapOf<Pair<String, String>, Handler>()
 
-    // GET /
-    routes["GET" to "/"] = { _, writer ->
-        val html = loadResource("/index.html") ?: "<h1>Not found</h1>"
-        sendResponse(writer, 200, "text/html", html)
-    }
+    routes["GET" to "/"] = { _, socket -> socket.getOutputStream().write(CachedResponses.index) }
+    routes["GET" to "/css/style.css"] = { _, socket -> socket.getOutputStream().write(CachedResponses.css) }
+    routes["GET" to "/js/script.js"] = { _, socket -> socket.getOutputStream().write(CachedResponses.js) }
+    routes["GET" to "/favicon.ico"] = { _, socket -> socket.getOutputStream().write(CachedResponses.favicon) }
 
-    // GET /about
-    routes["GET" to "/about"] = { _, writer ->
-        sendResponse(writer, 200, "text/html", "<h1>About page</h1>")
-    }
-
-    // POST /users
-    routes["POST" to "/users"] = { request, writer ->
-        val body = request.body
-        sendResponse(writer, 201, "application/json", """{"received": "$body"}""")
-    }
-
-    // Ignore favicon requests
-    routes["GET" to "/favicon.ico"] = { _, writer ->
-        sendResponse(writer, 204, "text/plain", "")
+    routes["POST" to "/echo"] = { request, socket ->
+        val response = buildResponse(201, "application/json", """{"received":"${request.body}"}""")
+        socket.getOutputStream().write(response)
     }
 
     return routes
-}
-
-fun loadResource(path: String): String? {
-    return object {}.javaClass.getResource(path)?.readText()
 }

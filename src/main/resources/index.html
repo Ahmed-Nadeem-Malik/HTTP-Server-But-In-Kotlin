@@ -1,11 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
-    <meta charset="UTF-8">
-    <title>Example Template</title>
+    <title>MultithreadedServer</title>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body>
-<h1> Hello World </h1>
-<h1>this is a example of a http server</h1>
+<div class="container">
+    <h1>Multithreaded HTTP Server</h1>
+    <p>High-performance Kotlin HTTP server with coroutines</p>
+
+    <nav>
+        <a href="/">Home</a>
+    </nav>
+
+    <div class="content">
+        <h2>Available Endpoints</h2>
+        <ul>
+            <li><strong>GET /</strong> - This homepage</li>
+            <li><strong>POST /echo</strong> - Echo request body</li>
+        </ul>
+
+        <div class="demo-section">
+            <h3>Try the Echo Endpoint</h3>
+            <textarea id="echoInput" placeholder="Type something to echo..."></textarea>
+            <button onclick="testEcho()">Send to /echo</button>
+            <div id="echoResult"></div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/script.js"></script>
 </body>
+
 </html>

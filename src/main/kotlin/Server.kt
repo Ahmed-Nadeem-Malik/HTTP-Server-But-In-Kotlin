@@ -22,27 +22,18 @@ fun handleClient(client: Socket, routes: Map<Pair<String, String>, Handler>) {
         val request = parsing(reader)
         val route = request.method.uppercase() to request.path
 
-        val handler = routes[route]
-
-        if (handler != null) {
-            handler(request, writer)
-        } else {
-            sendResponse(writer, 404, "text/html", "<h1>404 Not Found</h1>")
+        when (val handler = routes[route]) {
+            null -> sendResponse(writer, 404, "text/html", "<h1>404 Not Found</h1>")
+            else -> handler(request, writer)
         }
     }
 }
 
 fun sendResponse(
-    writer: BufferedWriter,
-    status: Int = 200,
-    contentType: String = "text/html",
-    body: String
+    writer: BufferedWriter, status: Int = 200, contentType: String = "text/html", body: String
 ) {
     val statusText = mapOf(
-        200 to "OK",
-        201 to "Created",
-        404 to "Not Found",
-        500 to "Internal Server Error"
+        200 to "OK", 201 to "Created", 404 to "Not Found", 500 to "Internal Server Error"
     )[status] ?: "Unknown"
 
     writer.write("HTTP/1.1 $status $statusText\r\n")
@@ -78,10 +69,7 @@ fun parsing(reader: BufferedReader): HTTP {
 }
 
 data class HTTP(
-    val method: String,
-    val path: String,
-    val headers: MutableMap<String, String>,
-    val body: String
+    val method: String, val path: String, val headers: MutableMap<String, String>, val body: String
 )
 
 // Handler takes request and writer

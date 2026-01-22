@@ -58,8 +58,8 @@ This server's primary implementation uses **Kotlin coroutines** with **Ktor asyn
 │   Network Layer │  Coroutine Pool │     Routing Engine          │
 │                 │                 │                             │
 │ • Ktor Sockets  │ • Coroutines    │ • Simple Route Registration │
-│ • Async I/O    │ • IO Dispatcher │ • Lambda-based Handlers     │
-│ • Channel Mgmt  │ • Parallel Async │ • Cached Static Content     │
+│ • Async I/O     │ • IO Dispatcher │ • Lambda-based Handlers     │
+│ • Channel Mgmt  │ • Parallel Async│ • Cached Static Content     │
 └─────────────────┴─────────────────┴─────────────────────────────┘
 ```
 
